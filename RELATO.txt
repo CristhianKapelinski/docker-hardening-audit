@@ -1,0 +1,412 @@
+TAREFA 3 - CRIACAO ASSISTIDA POR IA DE UM ARTEFATO EM CIBERSEGURANCA
+Cristhian Kapelinski
+
+
+=====================================================================
+1. REPOSITORIO PUBLICO
+=====================================================================
+
+https://gitlab.com/cristhianavila.aluno/docker-hardening-audit
+
+Publico, branch main, licenca MIT. Nao esta' no GitHub porque a minha conta de
+la' esta' suspensa; o enunciado pede repositorio publico, e o GitLab atende o
+mesmo requisito.
+
+Artefato: dhaudit 1.0.0, ferramenta de linha de comando que audita hardening de
+imagens Docker. Em vez de ser mais um linter, ela ORQUESTRA os scanners que ja'
+existem (hadolint, trivy e dockle), normaliza a saida dos tres numa politica
+unica de 14 propriedades, deduplica, arbitra falso positivo conhecido, e tem
+codigo proprio somente nas sete lacunas que uma medicao mostrou existir.
+
+
+=====================================================================
+2. MODELOS DE IA UTILIZADOS EM CADA ETAPA
+=====================================================================
+
+Desenvolvimento do codigo:
+  Claude Opus 5 (claude-opus-5), pela CLI Claude Code, em sessao interativa,
+  com conducao minha a cada etapa e decisoes registradas na secao 4.
+
+Geracao do README.md e da documentacao (docs/COVERAGE.md, docs/DOCUMENTATION.md):
+  Claude Opus 5, na mesma sessao.
+
+Revisao critica do artefato (etapa 2.3 do enunciado):
+  Claude Sonnet 5, em sessao separada, sem o historico do desenvolvimento, com
+  instrucao explicita de agir como revisor do CTA e de NAO alterar arquivo
+  nenhum.
+
+  Registro honesto: a minha primeira escolha para a revisao foi o DeepSeek
+  v4-pro, exatamente para que o revisor fosse de outra familia de modelo e nao
+  herdasse os pontos cegos de quem escreveu o codigo. As duas tentativas
+  (v4-pro e v4-flash) falharam com "model_not_found" na conta, e a revisao foi
+  feita no Sonnet 5. E' um modelo diferente do que escreveu o artefato, mas da
+  mesma familia; a limitacao esta' registrada na secao 6.
+
+
+=====================================================================
+3. PRINCIPAIS PROMPTS
+=====================================================================
+
+--- 3.1 Prompt que definiu o problema (bom resultado) ---
+
+Nao pedi "gere uma ferramenta de seguranca". Exigi que o problema fosse
+escolhido entre alternativas concretas, com a decisao sendo minha. A IA devolveu
+quatro opcoes (auditor de pipeline CI/CD; detector de forca bruta em log SSH;
+auditor de configuracao TLS/nginx; verificador de hardening de imagem Docker) e
+eu escolhi a ultima.
+
+Por que funcionou: a decomposicao do problema ficou explicita antes de existir
+qualquer linha de codigo, e o escopo saiu do meu criterio.
+
+--- 3.2 Prompt que corrigiu o rumo, e foi o mais importante do trabalho ---
+
+Prompt: "lembre de nao reinventar a roda"
+
+O que existia antes dele: um linter proprio de Dockerfile, com 12 regras
+escritas do zero (DH001 a DH012), parser proprio e motor de regras proprio.
+Funcionava e tinha teste. E era reinventar o hadolint.
+
+O que mudou depois: o artefato passou a orquestrar as ferramentas existentes. E,
+em vez de decidir por intuicao o que faltava, MEDIMOS: rodamos hadolint v2.15.1
+e trivy 0.74.0 sobre os Dockerfiles do corpus e levantamos, propriedade por
+propriedade, quem cobre o que. Tres das regras que a IA havia escrito (higiene
+do apt, healthcheck e pinagem de dependencia) foram APAGADAS porque a medicao
+mostrou que os backends ja' as cobrem. Ficaram sete checagens nativas, cada uma
+com a lacuna medida registrada em docs/COVERAGE.md.
+
+Resultado da medicao, que so' existe por causa desse prompt:
+  hadolint sozinho ......... 4 de 12 propriedades, recall 0,296
+  trivy sozinho ............ 6 de 12 propriedades, recall 0,519
+  uniao dos dois ........... 7 de 12 propriedades, recall 0,593, 1 falso positivo
+  dhaudit (agregado) ...... 12 de 12 propriedades, recall 0,963, 0 falso positivo
+
+--- 3.3 Prompt que evitou um erro de seguranca grave ---
+
+Prompt: "cuidado com as versoes que vc usar, o trivy tem a vulnerabilidade la da
+invasao, entao cuidado com a versao"
+
+A IA havia pinado aquesec/trivy:0.58.2 sem conferir advisory nenhuma. Depois do
+alerta, ela consultou as fontes oficiais (API de advisories do GitHub e OSV) e
+confirmou o caso: GHSA-69fq-xp46-6x23 / CVE-2026-33634, critico, publicado em
+24/03/2026. Em 19/03/2026 um atacante publicou um release malicioso do trivy
+v0.69.4, forcou 76 das 77 tags do aquasecurity/trivy-action para malware que
+rouba credencial, e em 22/03 publicou imagens Docker Hub maliciosas v0.69.5 e
+v0.69.6.
+
+A 0.58.2 nao era uma das maliciosas, mas estava abaixo de tres correcoes
+posteriores (GHSA-mcj4-mphf-j9ff em 0.71.1, GHSA-q3fv-x8vg-qqm4 em 0.71.0,
+GHSA-8rc5-4fr6-64pw em 0.72.0). Subimos para 0.74.0.
+
+O incidente virou desenho, e nao apenas troca de versao: os backends passaram a
+ser pinados por DIGEST, o digest e' verificado antes de cada execucao
+(src/dhaudit/backends/__init__.py), e existe uma lista KNOWN_COMPROMISED que
+recusa por nome as versoes maliciosas. Isso e' a Reivindicacao #3 do README, com
+teste proprio (tests/test_backends.py).
+
+--- 3.4 Prompt que produziu resultado inadequado ---
+
+O primeiro pedido foi generico ("um artefato de ciberseguranca"). A resposta foi
+um linter completo em uma rodada: codigo que rodava, com teste, e que duplicava
+ferramenta existente sem nada verificavel para comparar. So' depois do prompt
+3.2 e da medicao o trabalho passou a ter resultado.
+
+Licao: prompt sem restricao de originalidade produz software que funciona e nao
+serve. A restricao ("nao reinvente") foi mais produtiva do que qualquer pedido
+de mais funcionalidade.
+
+--- 3.5 A sequencia de refinamento, em ordem ---
+
+Rodada 1: "faca um verificador de hardening de imagem Docker"
+  -> linter proprio, 12 regras, parser proprio.
+
+Rodada 2: "nao reinvente a roda"
+  -> orquestracao de hadolint/trivy/dockle, mas com o mapeamento
+     "codigo do backend -> propriedade" tirado da DOCUMENTACAO das ferramentas.
+
+Rodada 3: exigi que a cobertura fosse medida, nao lida
+  -> corpus rotulado, saida bruta dos backends versionada em corpus/raw/, e
+     tabela comparando cinco configuracoes. A medicao contrariou a documentacao
+     em dois pontos concretos (secao 4.2).
+
+Rodada 4: "cuidado com a versao do trivy"
+  -> auditoria de advisories, versoes atuais, verificacao de digest e recusa de
+     versao comprometida.
+
+Rodada 5: revisao por outro modelo, correcao dos defeitos encontrados
+  -> secao 5.
+
+
+=====================================================================
+4. DECISOES QUE EU TOMEI E A IA NAO RESOLVEU BEM SOZINHA
+=====================================================================
+
+4.1 Nao reinventar ferramenta existente. Sem restricao, a IA escreve o
+    componente inteiro do zero. A decisao de orquestrar em vez de reimplementar
+    foi minha, e foi ela que definiu o artefato.
+
+4.2 Exigir medicao em vez de suposicao. A IA propos o mapeamento a partir da
+    documentacao dos scanners. Exigi verificacao por execucao, e a medicao
+    contrariou a documentacao em dois pontos que mudaram o codigo:
+      - trivy DS-0004 cobre apenas a porta 22, e nao as outras portas
+        sensiveis (5432, 6379, 27017 passam);
+      - nem hadolint nem trivy acusam tag mutavel que nao seja ":latest",
+        entao "python:3.12-slim" passa nos dois.
+
+4.3 Conferir versao contra advisory antes de pinar (secao 3.3).
+
+4.4 A politica sobre pinagem de pacote de sistema. A IA tinha mapeado hadolint
+    DL3008 ("pine a versao no apt-get install") como violacao. Isso reprovava um
+    Dockerfile corretamente endurecido por instalar "ca-certificates" sem
+    versao. Decidi tirar DL3008, DL3018 e DL3028 da politica: Debian e Ubuntu
+    removem versoes superadas do repositorio, entao pinar versao de pacote de
+    sistema quebra o build em poucas semanas, e o digest da imagem base (que a
+    propria politica exige em HARD-02) ja' congela o snapshot de pacotes. Pip e
+    npm continuam dentro, porque o indice guarda todas as versoes e lock file e'
+    pratica normal. A razao esta' registrada em docs/COVERAGE.md.
+
+4.5 Nao inventar HEALTHCHECK falso no proprio Dockerfile. A ferramenta acusa
+    HARD-09 no Dockerfile dela mesma. A saida facil era escrever um
+    "HEALTHCHECK CMD dhaudit --version" para o proprio linter ficar verde.
+    Decidi documentar que a propriedade nao se aplica a imagem de CLI de
+    execucao unica e rodar a Reivindicacao #2 com --min-severity medium.
+    Satisfazer o proprio linter com um comando inutil seria mentir no resultado.
+
+4.6 O gabarito admite falha da propria ferramenta. Exigi um caso que NENHUMA
+    configuracao pega: o "curl | sh" dentro de heredoc do BuildKit
+    (vuln_15). Por isso o recall publicado e' 0,963 e nao 1,000. Corpus em que a
+    ferramenta acerta tudo nao mede nada.
+
+4.7 Publicar a ressalva de circularidade no README, e nao so' no documento
+    tecnico. A revisao apontou (com razao) que a politica foi definida DEPOIS de
+    medir as lacunas dos backends, entao o agregado vence uma politica desenhada
+    em torno dele. Decidi nao mexer no numero e nao esconder a ressalva: ela foi
+    para o README, ao lado da tabela, dizendo o que a comparacao sustenta e o
+    que nao sustenta.
+
+4.8 Nao fingir que o CI esta' verde. O pipeline esta' declarado e roda testes e
+    reproducao, mas no GitLab ele aparece como "failed" sem executar job nenhum,
+    porque a conta gratuita exige verificacao de identidade para liberar minutos
+    de runner compartilhado. Em vez de apagar a alegacao ou deixar a frase
+    otimista, escrevi a ressalva no README e criei scripts/verify_all.sh, que
+    roda localmente exatamente o que o CI roda.
+
+
+=====================================================================
+5. RESUMO DA REVISAO REALIZADA PELA IA
+=====================================================================
+
+Pedido: avaliar o artefato como revisor do CTA nos quatro criterios, EXECUTANDO
+os comandos que o README manda executar, lendo o codigo com olho critico,
+tentando quebrar a ferramenta com entradas adversariais, e auditando a honestidade
+do gabarito do corpus.
+
+O que a revisao fez de fato: leu o README, o COVERAGE e o DOCUMENTATION; rodou o
+teste minimo, a reproducao, a suite de testes, o comando de politica e os
+exemplos de uso; leu os onze modulos de src/; testou dez entradas adversariais;
+e conferiu os 23 arquivos do corpus contra os rotulos, alem de verificar
+externamente que o repositorio e' publico, que os tres digests batem com o
+registry, e que os CVEs citados existem com as versoes de correcao alegadas.
+
+Parecer: ATRIBUIR Disponibilidade, Sustentabilidade e Reprodutibilidade, com
+ressalvas; NAO ATRIBUIR Funcionalidade, por causa dos dois defeitos criticos
+abaixo.
+
+PROBLEMAS APONTADOS E O QUE EU FIZ COM CADA UM
+
+[1] CRITICO - Crash nao tratado em "FROM" sem imagem (parser.py).
+    "FROM" sozinho numa linha levantava IndexError, com traceback do Python e
+    codigo de saida 1, que e' o mesmo reservado para "ha' violacao".
+    ACAO: CORRIGIDO. O parser registra o problema em Dockerfile.parse_errors em
+    vez de indexar lista vazia. Teste novo:
+    test_from_without_an_image_is_recorded_not_raised.
+
+[2] CRITICO - Contrato de codigo de saida quebrado, e o teste confirmava o
+    comportamento errado. Caminho inexistente ou JSON invalido imprimiam
+    "error: ..." e retornavam 0, contra o que o README e o proprio docstring
+    prometiam. Pior: tests/test_cli.py afirmava "assert code == 0".
+    ACAO: CORRIGIDO. _exit_code agora devolve 2 quando ha' erro de entrada, com
+    precedencia sobre a violacao, e o teste passou a exigir 2. Verificado a mao:
+    caminho inexistente, JSON invalido, arquivo binario, arquivo vazio, arquivo
+    so' com comentario e "FROM" sem imagem devolvem todos 2; corpus com defeito
+    devolve 1; arquivo correto devolve 0.
+
+[3] ALTO - Falso positivo das checagens nativas: regex sobre a linha crua.
+    A revisao produziu dois em menos de um minuto:
+      RUN echo "nao rode: curl http://x/i.sh | sh"   -> acusava HARD-04
+      RUN echo "antes usava chmod 777" > NOTES.txt    -> acusava HARD-07
+    ACAO: CORRIGIDO, e o metodo mudou. Escrevi um separador de comandos com
+    consciencia de aspas (native.split_command), que divide o RUN em &&, ||, ;
+    e | fora de aspas e descarta os segmentos cujo programa e' echo/printf. As
+    checagens de download-executado e de permissao passaram a olhar o comando, e
+    nao o texto. Ganhos colaterais: "sudo chmod 777" agora e' pego pelas duas
+    checagens, "curl | sudo sh" tambem, e "COPY --chmod=777" passou a ser
+    detectado.
+    E a critica de metodo, que era mais seria que os dois bugs: o corpus tinha
+    controle negativo dificil para os backends e nenhum contra as regras
+    nativas. Acrescentei hardened_09_text_mentions_commands.Dockerfile, com
+    rotulo vazio, que menciona os dois comandos dentro de echo sem executar
+    nenhum. O corpus passou de 23 para 24 arquivos, e as metricas publicadas
+    continuaram identicas - o que agora e' uma afirmacao mais forte.
+
+[4] MEDIO - Arquivo binario ou sem nenhum FROM era reportado como "0 violacoes",
+    indistinguivel de um Dockerfile endurecido, contrariando o principio que a
+    propria ferramenta aplica aos backends ("silencio nao e' resultado limpo").
+    ACAO: CORRIGIDO. Ausencia de FROM entra em parse_errors, chega a
+    result.errors, aparece no relatorio e leva o codigo de saida para 2.
+
+[5] MEDIO - Verificacao de digest de hadolint/trivy rodava mesmo quando o unico
+    alvo era um JSON de configuracao de imagem, que nao usa esses backends;
+    imprimia "hadolint (unavailable)" no caminho que o README anuncia como "sem
+    docker".
+    ACAO: CORRIGIDO. aggregate._needs_dockerfile_backends decide, pelos tipos de
+    alvo, quais backends verificar. Teste novo:
+    test_an_image_config_target_does_not_check_dockerfile_backends.
+
+[6] MEDIO - CI publico falhando (pipeline "failed" com zero jobs), contra a
+    alegacao "CI rodando a cada push".
+    ACAO: NAO CORRIGIVEL POR MIM, E DECLARADO. Conferi pela API: os runners
+    compartilhados aparecem disponiveis (20 runners, varios online), o YAML nao
+    tem erro (yaml_errors: null) e o pipeline falha sem criar job - o padrao de
+    conta gratuita que exige verificacao de identidade para minutos de CI. Nao
+    consegui confirmar a causa exata sem acesso administrativo. Escrevi a
+    ressalva no README, no proprio selo Sustentavel, e criei
+    scripts/verify_all.sh, que roda localmente o mesmo conjunto do CI.
+
+[7] BAIXO - Circularidade do desenho nao destacada onde o numero aparece.
+    ACAO: CORRIGIDO (ver 4.7). Paragrafo "Como ler essa tabela" no README, junto
+    da tabela, dizendo que a politica foi construida em cima das lacunas medidas
+    dos backends e que a comparacao mede cobertura de politica, nao superioridade
+    geral.
+
+[8] BAIXO - Leitura duplicada do arquivo em aggregate.audit_dockerfile.
+    ACAO: CORRIGIDO. O parser passou a devolver o texto lido em
+    Dockerfile.source_text, e o agregador usa esse campo; o arquivo e' aberto uma
+    vez, e nao ha' duas decisoes independentes de decodificacao.
+
+Resultado: 8 problemas apontados, 7 corrigidos, 1 declarado com a razao tecnica.
+A suite passou de 57 para 68 testes; os 11 novos cobrem exatamente o que a
+revisao quebrou. O que a revisao NAO conseguiu verificar, e disse
+explicitamente: os caminhos que dependem de docker de verdade
+(scripts/dogfood.sh, reproduce.sh --live, dhaudit image com dockle).
+
+
+=====================================================================
+6. REFLEXAO CRITICA SOBRE O PROCESSO
+=====================================================================
+
+O QUE A IA ACELEROU
+
+Escrever o codigo, e por muito. Onze modulos, 68 testes, tres formatos de saida
+(tabela, JSON e SARIF), parser de Dockerfile com continuacao de linha e
+multi-stage, e a documentacao inteira sairam em uma sessao. Sozinho, isso seria
+trabalho de dias, principalmente os testes - que sao a parte que eu teria
+cortado por falta de tempo, e que foram justamente o que sustentou as correcoes
+depois.
+
+Acelerou tambem a verificacao factual: consultar as advisories do trivy, do
+hadolint e do dockle, cruzar com o OSV, e resolver os digests das imagens levou
+minutos.
+
+O QUE A IA FEZ BEM
+
+Estrutura. A separacao por responsabilidade (parser, politica, backends,
+agregacao, avaliacao, relatorio, CLI) ficou limpa desde o inicio, e a revisao,
+que era adversarial, reconheceu isso sem eu pedir.
+
+Documentacao que explica DECISAO, e nao so' descricao. Cada modulo diz que
+escolha ele carrega, o que fez a revisao conseguir criticar o desenho em vez de
+so' apontar estilo.
+
+Refatoracao dirigida. Quando eu disse "nao reinvente a roda", a IA nao remendou:
+apagou o linter proprio, mediu a cobertura dos backends e reconstruiu em cima da
+medicao.
+
+LIMITACOES ENCONTRADAS
+
+A mais forte: sem restricao explicita, ela reimplementa o que ja' existe. O
+primeiro artefato era um hadolint pior. Isso nao aparece como erro - o codigo
+roda, os testes passam - e e' o tipo de problema que so' quem conhece o dominio
+percebe.
+
+A segunda: ela confia na documentacao. O mapeamento inicial "codigo do backend
+-> propriedade" veio do que as ferramentas dizem cobrir, e a medicao contrariou
+isso em dois pontos concretos. Documentacao nao e' comportamento.
+
+A terceira: ela nao desconfia por conta propria. Pinou uma versao do trivy sem
+checar advisory, num artefato cujo tema e' supply chain. O alerta veio de mim.
+
+A quarta, sobre a revisao: pedir a uma IA que revise codigo de IA funciona, mas
+com limite. A revisao encontrou dois bugs criticos reais que eu nao tinha visto,
+e a critica de metodo sobre o corpus foi a contribuicao mais valiosa dela. Ao
+mesmo tempo, ela cometeu escorregoes proprios: rodou por acidente um comando que
+dependia de rede quando eu tinha pedido para nao rodar, e criou um symlink
+quebrado dentro do repositorio ao montar um teste (percebeu e removeu, e o
+git status confirmou o repo limpo). E o revisor era da mesma familia de modelo
+do autor, porque o modelo de outra familia nao estava disponivel na conta - a
+independencia foi menor do que eu queria.
+
+ERROS QUE A IA GEROU, E QUE PRECISARAM DE INTERVENCAO
+
+1. Reimplementou hadolint (corrigido por mudanca de desenho, secao 3.2).
+2. Pinou versao de scanner sem checar advisory (secao 3.3).
+3. Crash em "FROM" sem imagem (achado pela revisao).
+4. Contrato de codigo de saida quebrado, e um teste travando o comportamento
+   errado como esperado - o pior dos defeitos, porque um teste verde reforcando
+   o erro atrasa a correcao (achado pela revisao).
+5. Falso positivo por regex sobre linha crua (achado pela revisao).
+6. Bug de verificacao de digest que eu mesmo achei rodando: "docker image
+   inspect" nao aceita "repo:tag@sha256:...", so' "repo@sha256:...". O efeito era
+   silencioso e grave - TODOS os backends apareciam como indisponiveis, e a
+   ferramenta imprimia "rode docker pull" para uma imagem que estava ali. Uma
+   ferramenta de seguranca falhando em silencio para o lado permissivo e' o pior
+   modo de falha possivel.
+7. Numeros de recurso estimados em vez de medidos. O README dizia que as imagens
+   de backend somavam ~1,1 GB; medi com du e sao 287 MB. Tempo de reproducao
+   dizia ~1 s; sao 0,04 s. A IA escreve numero plausivel quando nao tem o dado,
+   e numero plausivel em documentacao de artefato e' numero errado.
+
+A IMPORTANCIA DA VALIDACAO E DOS TESTES
+
+Os seis defeitos acima, com excecao do (1), foram encontrados EXECUTANDO, nao
+lendo. O (6) so' apareceu porque rodei o "dhaudit backends" numa maquina de
+verdade. O (7) so' apareceu porque medi em vez de reler. Os (3), (4) e (5) so'
+apareceram porque alguem tentou quebrar a ferramenta de proposito.
+
+Duas coisas do processo se provaram valiosas alem do esperado. A primeira: rodar
+tudo num clone limpo do remoto, e nao no diretorio de trabalho - foi assim que
+confirmei que os scripts tinham bit de execucao no git e que nada dependia de
+arquivo nao commitado. A segunda: o portao de reprodutibilidade comparando com
+expected/values.json, que eu testei perturbando de proposito um valor publicado
+para ver o "RESULT: FAIL" aparecer. Portao que nunca falhou nao e' portao, e' um
+"echo OK".
+
+Aprendizado do meio do caminho, que nem era sobre IA: o docker apagou as tres
+imagens de backend entre duas execucoes (a raiz da maquina estava em 91%), e a
+ferramenta passou a reportar todos os backends como indisponiveis. Isso validou
+uma decisao que ja' estava tomada - o caminho de reproducao padrao ler a saida
+bruta versionada, em vez de depender de scanner instalado - e me ensinou que
+puxar imagem por digest a guarda sem tag, entao ela nao aparece em
+"docker images".
+
+O QUE EU FARIA DIFERENTE
+
+Poria a restricao "nao reinvente o que existe; primeiro meça o que as
+ferramentas atuais cobrem" no PRIMEIRO prompt. Ela chegou na segunda rodada e
+custou um linter inteiro escrito e apagado.
+
+Pediria a auditoria de advisory das dependencias antes de escrever a primeira
+linha, e nao depois de pinar. Num artefato sobre supply chain, escolher versao
+de terceiro e' parte do desenho, nao detalhe de empacotamento.
+
+Faria a revisao adversarial mais cedo, e nao com o artefato pronto e publicado.
+Os dois bugs criticos existiam desde a primeira versao do CLI, e teriam custado
+minutos para corrigir naquele momento.
+
+Exigiria "medido com que comando?" ao lado de cada numero de recurso do README,
+de saida. Foi o unico tipo de erro que passou por todas as barreiras: pelos
+testes, pela revisao adversarial e pela minha leitura, e so' caiu quando fui
+medir.
+
+E, para a proxima, tentaria de novo a revisao por modelo de outra familia. Ter
+revisor da mesma familia do autor funcionou melhor do que eu esperava, mas nao
+substitui o ponto de vista de fora.
