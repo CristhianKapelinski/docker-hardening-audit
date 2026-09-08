@@ -1,6 +1,6 @@
 # Problema, motivação e limitações
 
-Este documento fica fora do README de propósito: o README segue o template de avaliação de artefatos, e o que está aqui é contexto, não requisito de avaliação.
+Para a avaliação do artefato, o [`README.md`](../README.md) é o único arquivo necessário; este é complementar.
 
 ## O problema
 

@@ -1,5 +1,7 @@
 # Uso
 
+Para a avaliação do artefato, o [`README.md`](../README.md) é o único arquivo necessário; este é complementar.
+
 Os comandos que a avaliação exige estão no README. Aqui ficam os demais.
 
 ## Auditar

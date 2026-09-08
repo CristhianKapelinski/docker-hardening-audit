@@ -1,5 +1,7 @@
 # Cobertura medida dos backends
 
+Para a avaliação do artefato, o [`README.md`](../README.md) é o único arquivo necessário; este é complementar.
+
 Este documento registra a medição que decidiu o desenho da ferramenta. Nada aqui foi lido na documentação dos scanners: os números vêm de rodar hadolint v2.15.1 e trivy 0.74.0 sobre os 24 Dockerfiles de `corpus/`, com a saída bruta versionada em `corpus/raw/`.
 
 A pergunta era direta: se hadolint, trivy e dockle já existem, o que falta para responder às 12 propriedades de hardening da política? A resposta define onde há código nativo neste repositório e onde não há.
@@ -20,18 +22,18 @@ Cada configuração é avaliada contra o gabarito de `corpus/labels.json`, que l
 
 | propriedade | hadolint | trivy | nativo | por que existe código nativo |
 |---|---|---|---|---|
-| HARD-01 não-root | — | `DS-0002` | `NAT-USER` | resolve o usuário pela cadeia de alias entre estágios, e cobre o caso de o trivy não estar disponível |
+| HARD-01 não-root | não cobre | `DS-0002` | `NAT-USER` | resolve o usuário pela cadeia de alias entre estágios, e cobre o caso de o trivy não estar disponível |
 | HARD-02 base pinada por digest | `DL3007` | `DS-0001` | `NAT-DIGEST` | os dois só disparam em `:latest`; `python:3.12-slim` passa |
 | HARD-03 sem segredo em ENV/ARG | `DL3064` | `DS-0031` | arbitragem | os dois acusam `ARG API_TOKEN` sem valor default, que não vaza nada |
-| HARD-04 sem `curl \| sh` | — | — | `NAT-PIPE` | nenhum dos dois tem checagem; `DL4006` é sobre `pipefail`, não sobre download não verificado |
-| HARD-05 cache do apt | `DL3009`, `DL3015` | `DS-0029` | — | coberto; não há código nativo |
-| HARD-06 sem `ADD` remoto | — | — | `NAT-ADD-REMOTE` | nenhum dos dois tem checagem |
-| HARD-07 sem permissão 777 | — | — | `NAT-WORLD-WRITABLE` | nenhum dos dois tem checagem |
-| HARD-08 sem porta sensível | — | `DS-0004` | `NAT-PORT` | `DS-0004` cobre só a porta 22; 5432, 6379 e 27017 passam |
-| HARD-09 healthcheck | — | `DS-0026` | — | coberto; não há código nativo |
-| HARD-10 sem sudo | `DL3004` | — | `NAT-SUDO` | `DL3004` dispara em `RUN sudo`, não em instalar o pacote sudo |
-| HARD-11 dependência pinada | `DL3013`, `DL3016` | — | — | coberto; não há código nativo |
-| HARD-12 `.dockerignore` | — | — | `NAT-DOCKERIGNORE` | é um fato do diretório, que nenhum dos dois olha |
+| HARD-04 sem `curl \| sh` | não cobre | não cobre | `NAT-PIPE` | nenhum dos dois tem checagem; `DL4006` é sobre `pipefail`, não sobre download não verificado |
+| HARD-05 cache do apt | `DL3009`, `DL3015` | `DS-0029` | não cobre | coberto; não há código nativo |
+| HARD-06 sem `ADD` remoto | não cobre | não cobre | `NAT-ADD-REMOTE` | nenhum dos dois tem checagem |
+| HARD-07 sem permissão 777 | não cobre | não cobre | `NAT-WORLD-WRITABLE` | nenhum dos dois tem checagem |
+| HARD-08 sem porta sensível | não cobre | `DS-0004` | `NAT-PORT` | `DS-0004` cobre só a porta 22; 5432, 6379 e 27017 passam |
+| HARD-09 healthcheck | não cobre | `DS-0026` | não cobre | coberto; não há código nativo |
+| HARD-10 sem sudo | `DL3004` | não cobre | `NAT-SUDO` | `DL3004` dispara em `RUN sudo`, não em instalar o pacote sudo |
+| HARD-11 dependência pinada | `DL3013`, `DL3016` | não cobre | não cobre | coberto; não há código nativo |
+| HARD-12 `.dockerignore` | não cobre | não cobre | `NAT-DOCKERIGNORE` | é um fato do diretório, que nenhum dos dois olha |
 
 Três checagens nativas foram **escritas e depois removidas** quando esta medição mostrou que hadolint e trivy já as cobrem: higiene do apt, healthcheck e pinagem de dependência. O repositório não tem código para elas.
 
@@ -43,7 +45,7 @@ Três checagens nativas foram **escritas e depois removidas** quando esta mediç
 
 ## O corpus tem controle adversarial contra as próprias checagens nativas
 
-Uma revisão adversarial do artefato, feita por outro modelo de IA, produziu dois falsos positivos em menos de um minuto: `RUN echo "não rode: curl x | sh"` disparava HARD-04, e `RUN echo "antes usava chmod 777" > NOTES` disparava HARD-07, porque as checagens eram regex sobre a linha crua. A crítica de método era mais séria que os dois bugs: o corpus tinha controles negativos difíceis para os backends, e nenhum contra as regras nativas — escritas pela mesma pessoa que escreveu o corpus.
+Uma revisão adversarial do artefato, feita por outro modelo de IA, produziu dois falsos positivos em menos de um minuto: `RUN echo "não rode: curl x | sh"` disparava HARD-04, e `RUN echo "antes usava chmod 777" > NOTES` disparava HARD-07, porque as checagens eram regex sobre a linha crua. A crítica de método era mais séria que os dois bugs: o corpus tinha controles negativos difíceis para os backends, e nenhum contra as regras nativas, escritas pela mesma pessoa que escreveu o corpus.
 
 As checagens foram reescritas para separar comandos respeitando aspas e descartar argumento de `echo`/`printf` (`native.split_command`), e o caso entrou no corpus como `hardened_09_text_mentions_commands.Dockerfile`, com rótulo vazio. Nele, hadolint reporta só código fora da política (`DL3025`, `DL3059`, `DL3066`), o trivy não reporta nada, e as checagens nativas não reportam nada. Antes da correção, o agregado teria dois falsos positivos nesse arquivo.
 

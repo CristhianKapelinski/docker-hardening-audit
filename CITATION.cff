@@ -1,0 +1,23 @@
+cff-version: 1.2.0
+message: "Se este artefato for útil no seu trabalho, cite-o como abaixo."
+title: "dhaudit: auditoria de hardening de imagens Docker sobre hadolint, trivy e dockle"
+abstract: >-
+  Ferramenta de linha de comando que audita hardening de imagens Docker
+  orquestrando hadolint, trivy e dockle a partir de imagens pinadas por digest,
+  normalizando a saída dos três para uma política única de 14 propriedades, e
+  implementando checagens próprias apenas nas lacunas medidas.
+version: 1.0.0
+date-released: "2026-09-08"
+license: MIT
+type: software
+repository-code: "https://gitlab.com/cristhianavila.aluno/docker-hardening-audit"
+keywords:
+  - docker
+  - container-security
+  - hardening
+  - static-analysis
+  - supply-chain
+authors:
+  - family-names: Kapelinski
+    given-names: Cristhian
+    affiliation: "Universidade Federal do Pampa (UNIPAMPA)"
