@@ -1,6 +1,6 @@
 # dhaudit: auditoria de hardening de imagens Docker
 
-`dhaudit` audita o hardening de imagens Docker orquestrando os scanners que já existem — hadolint, trivy e dockle —, traduzindo a saída dos três para uma política única de 14 propriedades, deduplicando o que dois deles dizem sobre a mesma linha, e escrevendo código próprio **somente** nas lacunas que uma medição mostrou existir. Sobre um corpus rotulado de 23 Dockerfiles, hadolint responde a **4 das 12** propriedades de Dockerfile e o trivy a **6**; a união dos dois chega a **7**, com recall **0,593** e um falso positivo. O agregado chega a **12 de 12**, com precisão **1,000** e recall **0,963**.
+`dhaudit` audita o hardening de imagens Docker orquestrando os scanners que já existem — hadolint, trivy e dockle —, traduzindo a saída dos três para uma política única de 14 propriedades, deduplicando o que dois deles dizem sobre a mesma linha, e escrevendo código próprio **somente** nas lacunas que uma medição mostrou existir. Sobre um corpus rotulado de 24 Dockerfiles, hadolint responde a **4 das 12** propriedades de Dockerfile e o trivy a **6**; a união dos dois chega a **7**, com recall **0,593** e um falso positivo. O agregado chega a **12 de 12**, com precisão **1,000** e recall **0,963**.
 
 **Para a avaliação deste artefato, este README é o único arquivo que você precisa ler.** Os outros documentos são complementares: [`docs/COVERAGE.md`](docs/COVERAGE.md) traz a medição de cobertura que decidiu o desenho, e [`docs/DOCUMENTATION.md`](docs/DOCUMENTATION.md) descreve a arquitetura módulo a módulo.
 
@@ -50,7 +50,9 @@ Os selos considerados são: **Disponíveis**, **Funcionais**, **Sustentáveis** 
 
 - **Disponível (SeloD).** Repositório público no GitLab, licença MIT, e este README com as seções mínimas exigidas.
 - **Funcional (SeloF).** O [teste mínimo](#teste-mínimo) é um comando, roda sem rede e sem docker, e exercita o caminho real (parser, mapeamento, arbitragem, relatório e código de saída), não `--help`.
-- **Sustentável (SeloS).** Código em `src/` com uma responsabilidade por módulo, docstrings dizendo qual decisão cada módulo carrega, tipagem nas funções públicas, 57 testes sem rede, CI rodando testes e reprodução a cada push, e `docs/DOCUMENTATION.md` explicando como acrescentar propriedade ou backend.
+- **Sustentável (SeloS).** Código em `src/` com uma responsabilidade por módulo, docstrings dizendo qual decisão cada módulo carrega, tipagem nas funções públicas, 68 testes sem rede, um pipeline declarado em `.gitlab-ci.yml` que roda testes e reprodução (ver a ressalva abaixo), e `docs/DOCUMENTATION.md` explicando como acrescentar propriedade ou backend.
+> **Ressalva sobre o CI.** O pipeline está declarado em `.gitlab-ci.yml` e roda os testes, o teste mínimo e a reprodução. No GitLab, porém, o pipeline público deste projeto aparece como `failed` **sem executar nenhum job**: a conta é gratuita e os runners compartilhados exigem verificação de identidade para liberar minutos de CI. Os runners aparecem como disponíveis pela API e o YAML não tem erro (`yaml_errors: null`), mas não consegui confirmar a causa exata sem acesso administrativo. Enquanto isso, o mesmo conjunto que o CI roda é reproduzível localmente em menos de um segundo com `./scripts/verify_all.sh`.
+
 - **Reprodutível (SeloR).** `./scripts/reproduce.sh` recomputa a tabela publicada a partir da corrida de referência versionada e compara valor por valor com `expected/values.json`, imprimindo `obtido · esperado · ok` e terminando em `RESULT: OK`. O modo `--live` roda os scanners de novo, nas imagens pinadas.
 
 ## Informações básicas
@@ -59,10 +61,12 @@ Máquina de referência das medidas de tempo abaixo: AMD Ryzen 5 8600G, 32 GB de
 
 | Modo | Requisitos | Disco (cumulativo) | Tempo |
 |---|---|---|---|
-| clone do repositório | git | ~1,5 MB | ~2 s |
-| teste mínimo e reprodução offline | Python 3.10 a 3.13, nada mais | ~1,5 MB | ~1 s |
-| suíte de testes | Python + pytest | ~1,5 MB | ~1 s |
-| auditoria ao vivo e `reproduce.sh --live` | Docker, e as três imagens de backend | ~1,1 GB (imagens) | ~2 min na primeira vez, ~25 s depois |
+| clone do repositório | git | 1,2 MB | ~2 s |
+| teste mínimo e reprodução offline | Python 3.10 a 3.13, nada mais | 1,2 MB | 0,07 s e 0,04 s |
+| suíte de testes | Python + pytest | 1,2 MB | 0,2 s |
+| auditoria ao vivo e `reproduce.sh --live` | Docker, e as três imagens de backend | +290 MB de imagens e +3,1 MB de cache do trivy | ~2 min na primeira vez, ~25 s depois |
+
+Os valores de disco e de tempo acima foram medidos com `du -sh` e `/usr/bin/time` nesta máquina, não estimados. As imagens de backend somam 287 MB (hadolint 64 MB, trivy 190 MB, dockle 33 MB) e são removidas com `docker image rm`.
 
 Não é preciso GPU. Nenhum caminho exige privilégio de root na máquina do avaliador; o caminho de imagem construída (`dhaudit image`) precisa de acesso ao socket do Docker, e é opcional.
 
@@ -106,7 +110,7 @@ Nada mais é preciso para o teste mínimo e para a reprodução: os scripts usam
 python3 -m venv .venv && . .venv/bin/activate && python3 -m pip install --quiet '.[dev]'
 ```
 
-Para o caminho ao vivo, baixe as três imagens de backend (~1,1 GB, ~2 min):
+Para o caminho ao vivo, baixe as três imagens de backend (287 MB, ~2 min):
 
 ```bash
 ./scripts/pull_backends.sh
@@ -114,7 +118,7 @@ Para o caminho ao vivo, baixe as três imagens de backend (~1,1 GB, ~2 min):
 
 ## Teste mínimo
 
-Um comando, sem rede e sem docker, ~1 s:
+Um comando, sem rede e sem docker, 0,07 s:
 
 ```bash
 ./scripts/minimal_test.sh
@@ -149,9 +153,9 @@ As três reivindicações do artefato. A **#1 é a principal**.
 
 ### Reivindicação #1
 
-**Descrição.** Sobre o corpus rotulado de 23 Dockerfiles, o agregado cobre 12 das 12 propriedades de Dockerfile com precisão 1,000 e recall 0,963, contra 7 propriedades e recall 0,593 da união de hadolint e trivy.
+**Descrição.** Sobre o corpus rotulado de 24 Dockerfiles, o agregado cobre 12 das 12 propriedades de Dockerfile com precisão 1,000 e recall 0,963, contra 7 propriedades e recall 0,593 da união de hadolint e trivy.
 
-**Execução** (~1 s, sem rede e sem docker):
+**Execução** (0,04 s, sem rede e sem docker):
 
 ```bash
 ./scripts/reproduce.sh
@@ -171,6 +175,8 @@ native          16   0  11      1.000    0.593  0.744           8
 dhaudit         26   0   1      1.000    0.963  0.981          12
 ```
 
+**Como ler essa tabela.** A política de 14 propriedades foi definida DEPOIS de medir onde hadolint e trivy falham, e as checagens nativas foram escritas exatamente para as lacunas medidas. Então a comparação diz "quanto de uma política de hardening explícita cada configuração cobre", e não "o agregado é melhor que os scanners": a política foi construída em cima das lacunas deles. O que a tabela sustenta é que rodar os dois scanners e somar a saída deixa 5 das 12 propriedades sem resposta, e que a diferença é preenchível com pouco código.
+
 O único falso negativo do agregado é `vuln_15_heredoc_pipe.Dockerfile`, e ele é uma limitação declarada: o `curl | sh` está dentro de um heredoc do BuildKit, que nenhuma das configurações lê. O único falso positivo de hadolint e de trivy é o `ARG` sem valor default de `hardened_05`, removido pela arbitragem.
 
 Para refazer a medição rodando os scanners de novo, em vez de reler a corrida de referência (~2 min, precisa de docker):
@@ -189,7 +195,7 @@ Para refazer a medição rodando os scanners de novo, em vez de reler a corrida 
 ./scripts/dogfood.sh
 ```
 
-**Recursos esperados.** ~1,1 GB de disco para as imagens de backend, ~300 MB de RAM.
+**Recursos esperados.** 287 MB de disco para as imagens de backend, ~300 MB de RAM.
 
 **Resultado esperado.**
 
@@ -254,7 +260,7 @@ Ver a política e quem responde a cada propriedade:
 PYTHONPATH=src python3 -m dhaudit.cli policy
 ```
 
-Códigos de saída: `0` nenhuma violação no limiar, `1` violação no limiar de `--fail-on` (padrão `high`), `2` erro de uso ou de entrada.
+Códigos de saída: `0` nenhuma violação no limiar, `1` violação no limiar de `--fail-on` (padrão `high`), `2` erro de uso ou de entrada. O `2` tem precedência sobre o `1`: um alvo que não pôde ser lido, um JSON inválido ou um arquivo sem nenhum `FROM` não foram auditados, e devolver `0` ou `1` diria ao pipeline que foram.
 
 ## Estrutura do repositório
 
@@ -269,14 +275,14 @@ src/dhaudit/            código da ferramenta
   cli.py                subcomandos e código de saída
   backends/             um módulo por scanner, mais as checagens nativas
 corpus/
-  dockerfiles/          22 Dockerfiles rotulados (14 com defeito, 8 corretos)
+  dockerfiles/          23 Dockerfiles rotulados (14 com defeito, 9 corretos)
   dockerfiles_no_ignore/ o caso de .dockerignore ausente, que precisa de diretório próprio
   image_configs/        dois exemplos de docker inspect, um com defeito e um correto
   labels.json           gabarito: as propriedades esperadas por arquivo
   raw/                  corrida de referência: saída bruta de hadolint e trivy
 expected/values.json    os números publicados neste README, alvo da comparação
-scripts/                pull_backends, minimal_test, reproduce, collect_backends, dogfood
-tests/                  57 testes, sem rede e sem docker
+scripts/                pull_backends, minimal_test, reproduce, collect_backends, dogfood, verify_all
+tests/                  68 testes, sem rede e sem docker
 docs/                   COVERAGE.md (a medição) e DOCUMENTATION.md (a arquitetura)
 ```
 
@@ -286,14 +292,15 @@ docs/                   COVERAGE.md (a medição) e DOCUMENTATION.md (a arquitet
 PYTHONPATH=src python3 -m pytest tests/ -q
 ```
 
-57 testes, ~1 s, sem rede e sem docker. Cada checagem nativa tem controle positivo e negativo; a arbitragem, a consistência da política, o contrato de código de saída da CLI e a reivindicação #1 têm testes próprios.
+68 testes, menos de 1 s, sem rede e sem docker. Cada checagem nativa tem controle positivo e negativo; a arbitragem, a consistência da política, o contrato de código de saída da CLI, as entradas malformadas e a reivindicação #1 têm testes próprios.
 
 ## Limitações conhecidas
 
 - **Heredoc do BuildKit não é analisado.** O corpo de `RUN <<EOF ... EOF` é contado e ignorado; o parser diz quantos ficaram de fora, e o relatório imprime a nota. É o único falso negativo da reivindicação #1.
 - **Segredo passado por `--build-arg` na linha de comando não é visível** na análise estática, por definição: ele não está no Dockerfile.
 - **A política é opinativa.** A pinagem de versão de pacote de sistema (`DL3008`, `DL3018`) ficou fora dela de propósito, com a razão em `docs/COVERAGE.md`; quem discorda pode mapear o código em `policy.BACKEND_MAP`.
-- **O corpus é sintético.** Os 23 arquivos foram escritos para exercitar as propriedades, incluindo controles negativos difíceis, e não são uma amostra de Dockerfiles do mundo real. A tabela da reivindicação #1 mede cobertura de política, não prevalência.
+- **O corpus é sintético.** Os 24 arquivos foram escritos para exercitar as propriedades, incluindo controles negativos difíceis e um controle adversarial contra as próprias checagens nativas (`hardened_09`, que menciona `curl | sh` e `chmod 777` dentro de `echo` sem executar nenhum dos dois). A tabela da reivindicação #1 mede cobertura de política, não prevalência.
+- **A análise de comando não é um shell.** As checagens nativas separam os comandos de um `RUN` respeitando aspas e descartam o que é argumento de `echo`/`printf`, o que mata a classe de falso positivo mais comum. O que elas não fazem é resolver variável, `eval`, alias ou script chamado por caminho: `RUN $INSTALL` com `ENV INSTALL="curl x | sh"` passa.
 - **Só hadolint e trivy entram na medição.** O dockle avalia imagem construída, não Dockerfile, então ele fica fora do corpus e é exercitado pelo caminho `dhaudit image`.
 - **Vulnerabilidade de pacote não é escopo.** Quem responde isso é `trivy image`; aqui a pergunta é configuração e hardening.
 

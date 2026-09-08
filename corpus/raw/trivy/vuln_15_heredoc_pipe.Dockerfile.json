@@ -3,8 +3,8 @@
   "Trivy": {
     "Version": "0.74.0"
   },
-  "ReportID": "01a08214-a365-754b-8c80-7fdeeb304af5",
-  "CreatedAt": "2026-09-08T17:33:05.765348343Z",
+  "ReportID": "01a08228-da9d-7914-90a6-b1f9a2f82f10",
+  "CreatedAt": "2026-09-08T17:55:10.621596038Z",
   "ArtifactName": "/scan/vuln_15_heredoc_pipe.Dockerfile",
   "ArtifactType": "filesystem",
   "Results": [

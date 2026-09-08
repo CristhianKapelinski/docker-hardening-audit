@@ -47,3 +47,23 @@ def test_discover_accepts_a_file_and_a_directory(tmp_path):
     (tmp_path / "notes.md").write_text("no\n")
     assert len(parser.discover(tmp_path)) == 2
     assert parser.discover(tmp_path / "Dockerfile") == [tmp_path / "Dockerfile"]
+
+
+def test_from_without_an_image_is_recorded_not_raised():
+    doc = parser.parse_text("FROM\nRUN true\n")
+    assert doc.parse_errors == ["line 1: FROM without an image"]
+    assert doc.stages and doc.stages[0].base_image == ""
+
+
+def test_a_file_without_from_is_recorded_as_not_a_dockerfile():
+    assert parser.parse_text("# only a comment\n").parse_errors == [
+        "no FROM instruction found; this is not a Dockerfile"
+    ]
+    assert parser.parse_text("").parse_errors
+
+
+def test_source_text_is_kept_so_the_file_is_read_once(tmp_path):
+    target = tmp_path / "Dockerfile"
+    target.write_text("FROM alpine:3.20\nUSER app\n")
+    doc = parser.parse_file(target)
+    assert doc.source_text == "FROM alpine:3.20\nUSER app\n"

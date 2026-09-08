@@ -1,0 +1,21 @@
+{
+  "SchemaVersion": 2,
+  "Trivy": {
+    "Version": "0.74.0"
+  },
+  "ReportID": "01a08228-a8b3-7c50-bcc9-6e2f373613a9",
+  "CreatedAt": "2026-09-08T17:54:57.843808019Z",
+  "ArtifactName": "/scan/hardened_09_text_mentions_commands.Dockerfile",
+  "ArtifactType": "filesystem",
+  "Results": [
+    {
+      "Target": "hardened_09_text_mentions_commands.Dockerfile",
+      "Class": "config",
+      "Type": "dockerfile",
+      "MisconfSummary": {
+        "Successes": 27,
+        "Failures": 0
+      }
+    }
+  ]
+}

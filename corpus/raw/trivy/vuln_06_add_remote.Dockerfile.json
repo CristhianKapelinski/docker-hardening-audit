@@ -3,8 +3,8 @@
   "Trivy": {
     "Version": "0.74.0"
   },
-  "ReportID": "01a08214-84d0-7516-897a-4e8ed713ee7f",
-  "CreatedAt": "2026-09-08T17:32:57.936334387Z",
+  "ReportID": "01a08228-bdda-7190-9966-6c4b641b6480",
+  "CreatedAt": "2026-09-08T17:55:03.258103421Z",
   "ArtifactName": "/scan/vuln_06_add_remote.Dockerfile",
   "ArtifactType": "filesystem",
   "Results": [

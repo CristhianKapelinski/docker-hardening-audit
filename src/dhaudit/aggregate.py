@@ -132,11 +132,16 @@ def audit_dockerfile(
     target = Path(path)
     try:
         document = parser.parse_file(target)
-        source_text = target.read_text(encoding="utf-8", errors="replace")
     except OSError as exc:
         result.errors.append(f"{target}: cannot read ({exc.strerror})")
         return
+    source_text = document.source_text
     result.files.append(str(target))
+    # An instruction the parser could not read has to reach the report: a file
+    # with no FROM at all (a binary, a stray text file) would otherwise come
+    # back as "0 violations", indistinguishable from a hardened Dockerfile.
+    for problem in document.parse_errors:
+        result.errors.append(f"{target}: {problem}")
     rows: list[dict] = []
 
     if replay_dir is not None:
@@ -264,6 +269,20 @@ def _merge(rows: list[dict], document: Dockerfile | None, result: AuditResult) -
         )
 
 
+def _needs_dockerfile_backends(targets: list[str]) -> bool:
+    """Whether any target is a Dockerfile, which is what hadolint and trivy read.
+
+    Verifying them for a run whose only target is a `docker inspect` JSON costs
+    a `docker image inspect` and prints two irrelevant "unavailable" lines on the
+    path the README advertises as needing no docker.
+    """
+    for target in targets:
+        path = Path(target)
+        if path.is_dir() or (path.exists() and path.suffix != ".json"):
+            return True
+    return False
+
+
 def audit(
     targets: list[str],
     min_severity: Severity = Severity.LOW,
@@ -271,7 +290,10 @@ def audit(
 ) -> AuditResult:
     """Audit files and directories of Dockerfiles."""
     result = AuditResult()
-    statuses = {status.name: status for status in check_backends(replay_dir=replay_dir)}
+    names = DOCKERFILE_BACKENDS if _needs_dockerfile_backends(targets) else ("native",)
+    statuses = {
+        status.name: status for status in check_backends(names, replay_dir=replay_dir)
+    }
     result.backends = list(statuses.values())
     for target in targets:
         path = Path(target)

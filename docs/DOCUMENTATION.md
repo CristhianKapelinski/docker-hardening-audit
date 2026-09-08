@@ -33,7 +33,9 @@ Uma execução de `dhaudit scan Dockerfile` passa por cinco etapas, nesta ordem.
 
 **O estágio final é o que importa.** Rodar como root, deixar cache do apt ou instalar sudo num estágio de build não chega na imagem publicada. As checagens que dependem disso olham `Dockerfile.final_stage`, e o usuário efetivo é resolvido subindo a cadeia de alias (`FROM base` herda o `USER` de `base`), em `native._effective_user`.
 
-**Silêncio de backend não é resultado limpo.** `BackendOutput.parse_failed` distingue "não achou nada" de "não conseguiu ler", e o relatório imprime as duas coisas de forma diferente.
+**Silêncio de backend não é resultado limpo.** `BackendOutput.parse_failed` distingue "não achou nada" de "não conseguiu ler", e o relatório imprime as duas coisas de forma diferente. O mesmo vale para o parser próprio: `Dockerfile.parse_errors` carrega `FROM` sem imagem e ausência de `FROM`, e o agregador os põe em `result.errors`, o que leva o código de saída para 2. Sem isso, um arquivo binário passado como Dockerfile voltava como "0 violações", indistinguível de um Dockerfile endurecido.
+
+**Comando não é texto.** As checagens de `curl | sh` e de permissão 777 não são regex sobre a linha crua: `native.split_command` separa os comandos de um `RUN` respeitando aspas, e `_executable` descarta o que é argumento de `echo`/`printf`. Sem isso, `RUN echo "não rode: curl x | sh"` era reportado como download executado — um falso positivo que uma revisão adversarial produziu em menos de um minuto.
 
 **A severidade é da política, não do backend.** Os três scanners usam vocabulários diferentes de severidade para a mesma coisa. Quem decide o peso de uma propriedade é `policy.PROPERTIES`, então dois backends discordando de severidade não muda o relatório.
 
@@ -49,4 +51,6 @@ Uma execução de `dhaudit scan Dockerfile` passa por cinco etapas, nesta ordem.
 
 ## Testes
 
-`python3 -m pytest tests/ -q` roda 57 testes, sem rede e sem docker. Cada checagem nativa tem controle positivo e negativo, a arbitragem tem teste próprio, a consistência da política é verificada (nenhum mapeamento aponta para propriedade inexistente), o contrato de código de saída da CLI é testado, e a reivindicação do corpus está gateada em `tests/test_evaluate.py` — não só no script de reprodução.
+`python3 -m pytest tests/ -q` roda 68 testes, sem rede e sem docker. Cada checagem nativa tem controle positivo e negativo, a arbitragem tem teste próprio, a consistência da política é verificada (nenhum mapeamento aponta para propriedade inexistente), o contrato de código de saída da CLI é testado, e a reivindicação do corpus está gateada em `tests/test_evaluate.py` — não só no script de reprodução.
+
+Onze desses testes nasceram de uma revisão adversarial do artefato feita por outro modelo de IA, que executou os comandos do README e tentou quebrar a ferramenta. Eles cobrem `FROM` sem imagem, arquivo sem nenhum `FROM`, o código de saída de entrada inválida, e os dois falsos positivos de texto dentro de `echo`.

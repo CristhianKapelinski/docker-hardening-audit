@@ -137,6 +137,11 @@
     {
       "path": "dockerfiles/hardened_08_npm_ci.Dockerfile",
       "expected": []
+    },
+    {
+      "path": "dockerfiles/hardened_09_text_mentions_commands.Dockerfile",
+      "expected": [],
+      "note": "adversarial negative control: mentions `curl | sh` and `chmod 777` inside echo, runs neither"
     }
   ]
 }

@@ -1,6 +1,6 @@
 # Cobertura medida dos backends
 
-Este documento registra a medição que decidiu o desenho da ferramenta. Nada aqui foi lido na documentação dos scanners: os números vêm de rodar hadolint v2.15.1 e trivy 0.74.0 sobre os 23 Dockerfiles de `corpus/`, com a saída bruta versionada em `corpus/raw/`.
+Este documento registra a medição que decidiu o desenho da ferramenta. Nada aqui foi lido na documentação dos scanners: os números vêm de rodar hadolint v2.15.1 e trivy 0.74.0 sobre os 24 Dockerfiles de `corpus/`, com a saída bruta versionada em `corpus/raw/`.
 
 A pergunta era direta: se hadolint, trivy e dockle já existem, o que falta para responder às 12 propriedades de hardening da política? A resposta define onde há código nativo neste repositório e onde não há.
 
@@ -39,7 +39,13 @@ Três checagens nativas foram **escritas e depois removidas** quando esta mediç
 
 **hadolint falha ao ler heredoc do BuildKit.** Em `vuln_15_heredoc_pipe.Dockerfile` ele retorna apenas `DL1000` ("unexpected 'W'"), que é erro de parse, e nenhuma outra descoberta. Um agregador que trate "nenhuma descoberta" como "arquivo limpo" classifica esse arquivo como correto. Por isso o `hadolint.py` propaga `parse_failed` e o relatório imprime a linha `! hadolint could not parse ...`: o silêncio de um backend não é resultado limpo.
 
-**Ruído fora da política.** Sobre os 23 arquivos, `DL3025` (usar notação JSON em CMD) e `DL3066` (uid não numérico) disparam 18 vezes cada, inclusive em arquivos que estão corretos pela política. Eles não são erros do hadolint, apenas respondem a outra pergunta. O agregador os classifica como fora da política, conta e guarda no JSON, mas não os mistura com violação de hardening.
+**Ruído fora da política.** Sobre os 24 arquivos, `DL3025` (usar notação JSON em CMD) e `DL3066` (uid não numérico) disparam dezenas de vezes, inclusive em arquivos que estão corretos pela política. Eles não são erros do hadolint, apenas respondem a outra pergunta. O agregador os classifica como fora da política, conta e guarda no JSON, mas não os mistura com violação de hardening.
+
+## O corpus tem controle adversarial contra as próprias checagens nativas
+
+Uma revisão adversarial do artefato, feita por outro modelo de IA, produziu dois falsos positivos em menos de um minuto: `RUN echo "não rode: curl x | sh"` disparava HARD-04, e `RUN echo "antes usava chmod 777" > NOTES` disparava HARD-07, porque as checagens eram regex sobre a linha crua. A crítica de método era mais séria que os dois bugs: o corpus tinha controles negativos difíceis para os backends, e nenhum contra as regras nativas — escritas pela mesma pessoa que escreveu o corpus.
+
+As checagens foram reescritas para separar comandos respeitando aspas e descartar argumento de `echo`/`printf` (`native.split_command`), e o caso entrou no corpus como `hardened_09_text_mentions_commands.Dockerfile`, com rótulo vazio. Nele, hadolint reporta só código fora da política (`DL3025`, `DL3059`, `DL3066`), o trivy não reporta nada, e as checagens nativas não reportam nada. Antes da correção, o agregado teria dois falsos positivos nesse arquivo.
 
 ## Uma decisão de política que a medição forçou
 

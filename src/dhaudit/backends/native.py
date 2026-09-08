@@ -19,6 +19,8 @@ from __future__ import annotations
 
 import re
 
+from dataclasses import dataclass
+
 from ..model import Dockerfile, Stage
 
 SENSITIVE_PORTS = {
@@ -39,17 +41,104 @@ SECRET_KEY = re.compile(
     re.IGNORECASE,
 )
 _PLACEHOLDER = re.compile(r"^(?:\$\{?\w+\}?|\"\"|''|)$")
-_PIPE_TO_SHELL = re.compile(
-    r"(?:curl|wget)\b[^|;]*\|\s*(?:sudo\s+)?(?:ba|z|da)?sh\b|"
-    r"(?:ba|z|da)?sh\s+-c\s+[\"']?\$\((?:curl|wget)\b",
-    re.IGNORECASE,
-)
-_WORLD_WRITABLE = re.compile(
-    r"chmod\s+(?:-[A-Za-z]+\s+)*(?:0?777|0?666|[ugoa]*[+=][rwx]*w[rwx]*)\b"
-)
+_PERMISSIVE_MODE = re.compile(r"\b(?:0?777|0?666|[ugoa]*[+=][rwx]*w[rwx]*)\b")
+_SUBSTITUTED_DOWNLOAD = re.compile(r"[$<]\(\s*(?:curl|wget)\b|`\s*(?:curl|wget)\b", re.IGNORECASE)
+_DOWNLOADERS = {"curl", "wget"}
+_SHELLS = {"sh", "bash", "zsh", "dash", "ash", "busybox"}
+# Commands whose arguments are TEXT, not execution. Dropping their segments is
+# what keeps `RUN echo "do not run: curl x | sh"` from being reported as a
+# download piped into a shell, and `RUN echo "chmod 777 was used" > NOTES` from
+# being reported as a permission change. Both were real false positives.
+_TEXT_ONLY = {"echo", "printf", ":", "true", "false", "#"}
 _REMOTE_SOURCE = re.compile(r"\b(?:https?|ftp)://|\bgit@", re.IGNORECASE)
 
 NAME = "native"
+
+
+@dataclass(frozen=True)
+class Segment:
+    """One command in a shell line: the operator before it, and its words."""
+
+    operator: str   # "", "&&", "||", ";", "|"
+    text: str
+
+    @property
+    def words(self) -> list[str]:
+        return self.text.split()
+
+    @property
+    def program(self) -> str:
+        """The first word that is a program, skipping `VAR=value` prefixes."""
+        for word in self.words:
+            if "=" in word and not word.startswith("-"):
+                continue          # VAR=value prefix
+            return word.split("/")[-1]
+        return ""
+
+    @property
+    def command(self) -> str:
+        """The program being run, looking PAST `sudo`.
+
+        `sudo chmod 777 /app` is a chmod for every check except the one that
+        cares about sudo itself, which reads `program` instead.
+        """
+        words = self.words
+        for index, word in enumerate(words):
+            if "=" in word and not word.startswith("-"):
+                continue
+            if word.split("/")[-1] == "sudo":
+                continue
+            return word.split("/")[-1]
+        return ""
+
+
+def split_command(command: str) -> list[Segment]:
+    """Split a shell command on `&&`, `||`, `;` and `|` OUTSIDE quotes.
+
+    Matching a regex against the whole `RUN` line cannot tell a command from a
+    string that mentions one. This scanner tracks quoting, so text inside `echo`
+    stays inside the `echo` segment and is dropped by `_executable`.
+    """
+    segments: list[Segment] = []
+    quote: str | None = None
+    escaped = False
+    buffer: list[str] = []
+    operator = ""
+    index = 0
+    while index < len(command):
+        char = command[index]
+        if escaped:
+            buffer.append(char)
+            escaped = False
+        elif char == "\\":
+            buffer.append(char)
+            escaped = True
+        elif quote:
+            buffer.append(char)
+            if char == quote:
+                quote = None
+        elif char in "\"'":
+            buffer.append(char)
+            quote = char
+        else:
+            two = command[index : index + 2]
+            if two in ("&&", "||"):
+                segments.append(Segment(operator, "".join(buffer).strip()))
+                operator, buffer, index = two, [], index + 2
+                continue
+            if char in ";|":
+                segments.append(Segment(operator, "".join(buffer).strip()))
+                operator, buffer = char if char == ";" else "|", []
+            else:
+                buffer.append(char)
+        index += 1
+    segments.append(Segment(operator, "".join(buffer).strip()))
+    return [segment for segment in segments if segment.text]
+
+
+def _executable(command: str) -> list[Segment]:
+    """The segments that actually run something."""
+    return [s for s in split_command(command) if s.program not in _TEXT_ONLY]
 
 
 def _row(check: str, property_id: str, severity: str, doc: Dockerfile, line: int, message: str) -> dict:
@@ -128,11 +217,24 @@ def _digest(doc: Dockerfile) -> list[dict]:
 
 
 def _pipe_to_shell(doc: Dockerfile) -> list[dict]:
+    """A download whose output is executed, in either of the two usual forms."""
     rows = []
     for instruction in doc.all_instructions():
-        if instruction.keyword == "RUN" and _PIPE_TO_SHELL.search(instruction.raw):
-            rows.append(_row("NAT-PIPE", "HARD-04", "HIGH", doc, instruction.line,
-                             "RUN pipes a downloaded script straight into a shell"))
+        if instruction.keyword != "RUN":
+            continue
+        segments = _executable(instruction.raw)
+        for position, segment in enumerate(segments):
+            piped_into_shell = (
+                segment.operator == "|"
+                and segment.command in _SHELLS
+                and position > 0
+                and segments[position - 1].command in _DOWNLOADERS
+            )
+            substituted = segment.command in _SHELLS and _SUBSTITUTED_DOWNLOAD.search(segment.text)
+            if piped_into_shell or substituted:
+                rows.append(_row("NAT-PIPE", "HARD-04", "HIGH", doc, instruction.line,
+                                 "RUN executes the output of a download without verifying it"))
+                break
     return rows
 
 
@@ -146,11 +248,24 @@ def _add_remote(doc: Dockerfile) -> list[dict]:
 
 
 def _world_writable(doc: Dockerfile) -> list[dict]:
+    """A real `chmod` to a permissive mode, or `COPY --chmod=` with one."""
     rows = []
     for instruction in doc.all_instructions():
-        if instruction.keyword in {"RUN", "COPY", "ADD"} and _WORLD_WRITABLE.search(instruction.raw):
-            rows.append(_row("NAT-WORLD-WRITABLE", "HARD-07", "HIGH", doc, instruction.line,
-                             "grants write permission to every user in the image"))
+        if instruction.keyword == "RUN":
+            for segment in _executable(instruction.raw):
+                if segment.command != "chmod":
+                    continue
+                arguments = " ".join(word for word in segment.words if word != "chmod")
+                if _PERMISSIVE_MODE.search(arguments):
+                    rows.append(_row("NAT-WORLD-WRITABLE", "HARD-07", "HIGH", doc, instruction.line,
+                                     "chmod grants write permission to every user in the image"))
+                    break
+        elif instruction.keyword in {"COPY", "ADD"}:
+            for word in instruction.words:
+                if word.startswith("--chmod=") and _PERMISSIVE_MODE.search(word):
+                    rows.append(_row("NAT-WORLD-WRITABLE", "HARD-07", "HIGH", doc, instruction.line,
+                                     "COPY sets a mode writable by every user in the image"))
+                    break
     return rows
 
 
@@ -173,15 +288,16 @@ def _sudo(doc: Dockerfile) -> list[dict]:
     stage = doc.final_stage
     if stage is None:
         return []
-    installs = re.compile(
-        r"(?:apt(?:-get)?\s+install|apk\s+add|yum\s+install|dnf\s+install)\b[^&|;]*\bsudo\b"
-    )
-    invokes = re.compile(r"(?:^|&&\s*|;\s*|\|\s*)sudo\s")
+    installers = {"apt", "apt-get", "apk", "yum", "dnf", "zypper"}
     for instruction in stage.of("RUN"):
-        lowered = instruction.raw.lower()
-        if installs.search(lowered) or invokes.search(lowered):
-            return [_row("NAT-SUDO", "HARD-10", "HIGH", doc, instruction.line,
-                         "sudo is installed or invoked in the final stage")]
+        for segment in _executable(instruction.raw):
+            words = [word.lower() for word in segment.words]
+            if segment.program == "sudo":
+                return [_row("NAT-SUDO", "HARD-10", "HIGH", doc, instruction.line,
+                             "sudo is invoked in the final stage")]
+            if segment.command in installers and "sudo" in words:
+                return [_row("NAT-SUDO", "HARD-10", "HIGH", doc, instruction.line,
+                             "the sudo package is installed in the final stage")]
     return []
 
 

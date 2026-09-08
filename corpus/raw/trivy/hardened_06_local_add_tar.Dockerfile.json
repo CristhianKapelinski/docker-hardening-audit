@@ -3,8 +3,8 @@
   "Trivy": {
     "Version": "0.74.0"
   },
-  "ReportID": "01a08214-671f-7291-a226-a34f6c939dae",
-  "CreatedAt": "2026-09-08T17:32:50.335169104Z",
+  "ReportID": "01a08228-9de9-76ea-99d8-ab8e79fbc0ba",
+  "CreatedAt": "2026-09-08T17:54:55.081454165Z",
   "ArtifactName": "/scan/hardened_06_local_add_tar.Dockerfile",
   "ArtifactType": "filesystem",
   "Results": [

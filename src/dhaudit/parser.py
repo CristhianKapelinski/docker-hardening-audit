@@ -77,6 +77,7 @@ def parse_text(text: str, path: str = "Dockerfile", has_dockerignore: bool = Tru
     preamble = Stage(index=-1, base_image="", alias=None, line=0)
     heredocs = 0
     inside_heredoc: str | None = None
+    parse_errors: list[str] = []
 
     for number, logical in _logical_lines(text, escape):
         if inside_heredoc is not None:
@@ -94,8 +95,17 @@ def parse_text(text: str, path: str = "Dockerfile", has_dockerignore: bool = Tru
             inside_heredoc = heredoc.group(1)
         if keyword == "FROM":
             match = _FROM_ALIAS.match(instruction.raw)
-            image = match.group("image") if match else instruction.raw.split()[0]
-            alias = match.group("alias") if match else None
+            words = instruction.raw.split()
+            if match:
+                image, alias = match.group("image"), match.group("alias")
+            elif words:
+                image, alias = words[0], None
+            else:
+                # `FROM` with no argument is not a Dockerfile the daemon builds,
+                # and indexing the empty word list here used to raise IndexError
+                # and take the whole scan down with a traceback.
+                parse_errors.append(f"line {number}: FROM without an image")
+                image, alias = "", None
             stages.append(
                 Stage(index=len(stages), base_image=image, alias=alias, line=number)
             )
@@ -108,11 +118,16 @@ def parse_text(text: str, path: str = "Dockerfile", has_dockerignore: bool = Tru
     elif preamble.instructions:
         stages.append(preamble)
 
+    if not stages:
+        parse_errors.append("no FROM instruction found; this is not a Dockerfile")
+
     return Dockerfile(
         path=path,
         stages=stages,
         has_dockerignore=has_dockerignore,
         unparsed_heredocs=heredocs,
+        source_text=text,
+        parse_errors=parse_errors,
     )
 
 

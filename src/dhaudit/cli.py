@@ -61,6 +61,14 @@ def _severity(text: str) -> Severity | None:
 
 
 def _exit_code(result: aggregate.AuditResult, fail_on: Severity | None) -> int:
+    """0 clean, 1 violation at or above the threshold, 2 input error.
+
+    The input error wins over the violation: a run that could not read one of
+    its targets did not audit it, and returning 0 or 1 would tell the pipeline
+    that it did.
+    """
+    if result.errors:
+        return 2
     if fail_on is None:
         return 0
     worst = result.worst()

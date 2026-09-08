@@ -73,10 +73,33 @@ def test_policy_command_lists_the_pinned_backends(capsys):
     assert "HARD-01" in out and "@sha256:" in out
 
 
-def test_a_missing_target_is_a_reported_error(capsys):
+def test_a_missing_target_is_an_input_error(capsys):
+    """Exit 2, not 0: a target that was not read was not audited."""
     code, out = run(["scan", "does-not-exist", "--replay", REPLAY], capsys)
     assert "no such file" in out
-    assert code == 0
+    assert code == 2
+
+
+def test_a_file_with_no_from_is_not_reported_as_clean(tmp_path, capsys):
+    target = tmp_path / "Dockerfile"
+    target.write_bytes(b"\x7fELF\x02\x01\x01binary garbage")
+    code, out = run(["scan", str(target), "--replay", REPLAY], capsys)
+    assert "not a Dockerfile" in out
+    assert code == 2
+
+
+def test_from_without_an_image_does_not_crash(tmp_path, capsys):
+    target = tmp_path / "Dockerfile"
+    target.write_text("FROM\nRUN true\n")
+    code, out = run(["scan", str(target), "--replay", REPLAY], capsys)
+    assert "FROM without an image" in out
+    assert code == 2
+
+
+def test_an_image_config_target_does_not_check_dockerfile_backends(capsys):
+    _code, out = run(["scan", str(CORPUS / "image_configs/hardened.json")], capsys)
+    assert "backends: native" in out
+    assert "hadolint" not in out
 
 
 def test_unknown_severity_exits_two(capsys):

@@ -1,6 +1,6 @@
 {
   "_comment": "The numbers published in the README, transcribed from the run of record in corpus/raw/. The evaluation RECOMPUTES them from that raw output; this file is only the comparison target.",
-  "corpus_files": 23,
+  "corpus_files": 24,
   "metrics": {
     "hadolint": {
       "tp": 8,

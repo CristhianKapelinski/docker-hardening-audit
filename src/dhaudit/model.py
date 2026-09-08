@@ -119,12 +119,22 @@ class Stage:
 
 @dataclass
 class Dockerfile:
-    """A parsed Dockerfile: its stages plus the facts the native checks need."""
+    """A parsed Dockerfile: its stages plus the facts the native checks need.
+
+    `source_text` carries the bytes the parser already read, so a caller that
+    also needs the raw text (hadolint reads it from stdin) does not open the
+    file a second time and cannot disagree with the parser about decoding.
+
+    `parse_errors` is not cosmetic: an instruction the parser cannot make sense
+    of has to reach the report, or the file comes back as clean.
+    """
 
     path: str
     stages: list[Stage]
     has_dockerignore: bool
     unparsed_heredocs: int = 0
+    source_text: str = ""
+    parse_errors: list[str] = field(default_factory=list)
 
     @property
     def final_stage(self) -> Stage | None:
