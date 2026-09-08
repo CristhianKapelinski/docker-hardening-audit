@@ -2,14 +2,14 @@
 # dataset grande, então o pipeline é a prova de que o artefato funciona numa
 # máquina que não é a do autor.
 #
-# O pipeline só é criado quando a variável DHAUDIT_CI vale "true". A razão está
-# registrada: na conta em que este repositório está publicado, o GitLab responde
-# "Identity verification is required in order to run CI jobs" (confirmado pelo
-# lint oficial em modo dry_run), e uma conta gratuita sem verificação de
-# identidade cria o pipeline e o falha sem executar job nenhum. Um pipeline
-# vermelho que nunca rodou é pior evidência do que nenhum. Quem tiver conta
-# verificada define DHAUDIT_CI=true nas variáveis do projeto e o pipeline roda;
-# localmente, ./scripts/verify_all.sh executa exatamente os mesmos passos.
+# Este arquivo está válido (`ci/lint` responde `valid: true`) e completo, mas o
+# CI/CD está DESLIGADO nas configurações do projeto. A razão é da conta, não do
+# arquivo: o GitLab responde "Identity verification is required in order to run
+# CI jobs" (confirmado pelo lint oficial em modo dry_run), e nessa situação todo
+# push cria um pipeline e o falha sem executar job nenhum -- pior evidência do
+# que nenhuma. Para rodar: habilite CI/CD em Settings > General > Visibility, e
+# defina a variável DHAUDIT_CI=true. Localmente, ./scripts/verify_all.sh executa
+# exatamente os mesmos passos, em menos de um segundo.
 workflow:
   rules:
     - if: $DHAUDIT_CI == "true"
