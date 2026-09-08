@@ -183,12 +183,21 @@ Rodada 5: revisao por outro modelo, correcao dos defeitos encontrados
     para o README, ao lado da tabela, dizendo o que a comparacao sustenta e o
     que nao sustenta.
 
-4.8 Nao fingir que o CI esta' verde. O pipeline esta' declarado e roda testes e
-    reproducao, mas no GitLab ele aparece como "failed" sem executar job nenhum,
-    porque a conta gratuita exige verificacao de identidade para liberar minutos
-    de runner compartilhado. Em vez de apagar a alegacao ou deixar a frase
-    otimista, escrevi a ressalva no README e criei scripts/verify_all.sh, que
-    roda localmente exatamente o que o CI roda.
+4.8 Nao fingir que o CI esta' verde, e ir atras da causa real. A interface do
+    GitLab marcava o pipeline como "yaml invalido", o que era engano: o lint
+    oficial aprovava o arquivo (valid: true) e a API nao reportava erro de YAML.
+    Quem deu a resposta foi o lint em modo dry_run, que simula a criacao do
+    pipeline: "Identity verification is required in order to run CI jobs". E' a
+    conta gratuita sem verificacao de identidade, e nessa situacao TODO push cria
+    um pipeline e o falha sem executar job - inclusive depois de eu adicionar uma
+    regra de workflow, porque a falha de conta acontece antes de o GitLab avaliar
+    o arquivo.
+    Decisao: desliguei o CI/CD nas configuracoes do projeto (builds_access_level
+    = disabled), apaguei os cinco pipelines vermelhos, deixei o .gitlab-ci.yml no
+    repositorio com a razao escrita em comentario, e criei scripts/verify_all.sh,
+    que roda localmente exatamente o mesmo conjunto. Um pipeline vermelho que
+    nunca executou job e' pior evidencia do que nenhuma, e mentir na alegacao do
+    selo Sustentavel seria pior que as duas.
 
 
 =====================================================================
@@ -264,13 +273,15 @@ PROBLEMAS APONTADOS E O QUE EU FIZ COM CADA UM
 
 [6] MEDIO - CI publico falhando (pipeline "failed" com zero jobs), contra a
     alegacao "CI rodando a cada push".
-    ACAO: NAO CORRIGIVEL POR MIM, E DECLARADO. Conferi pela API: os runners
-    compartilhados aparecem disponiveis (20 runners, varios online), o YAML nao
-    tem erro (yaml_errors: null) e o pipeline falha sem criar job - o padrao de
-    conta gratuita que exige verificacao de identidade para minutos de CI. Nao
-    consegui confirmar a causa exata sem acesso administrativo. Escrevi a
-    ressalva no README, no proprio selo Sustentavel, e criei
-    scripts/verify_all.sh, que roda localmente o mesmo conjunto do CI.
+    ACAO: CAUSA CONFIRMADA E SITUACAO RESOLVIDA. A interface dizia "yaml
+    invalido", o lint oficial dizia valid: true e a API dizia yaml_errors: null.
+    O lint em modo dry_run resolveu a contradicao: "Identity verification is
+    required in order to run CI jobs". Nao e' o arquivo, e' a conta. Desliguei o
+    CI/CD nas configuracoes do projeto, apaguei os pipelines vermelhos, escrevi a
+    razao no comentario do .gitlab-ci.yml e no selo Sustentavel do README, e o
+    scripts/verify_all.sh roda localmente o mesmo conjunto. O repositorio deixou
+    de ter pipeline com erro (o endpoint de pipelines responde 403 com CI
+    desligado).
 
 [7] BAIXO - Circularidade do desenho nao destacada onde o numero aparece.
     ACAO: CORRIGIDO (ver 4.7). Paragrafo "Como ler essa tabela" no README, junto
@@ -410,3 +421,11 @@ medir.
 E, para a proxima, tentaria de novo a revisao por modelo de outra familia. Ter
 revisor da mesma familia do autor funcionou melhor do que eu esperava, mas nao
 substitui o ponto de vista de fora.
+
+Um ultimo aprendizado, que nao e' sobre IA nem sobre codigo: rotulo de interface
+nao e' diagnostico. O GitLab estampava "yaml invalido" num arquivo que o proprio
+lint dele aprovava, e a causa verdadeira ("Identity verification is required in
+order to run CI jobs") so' apareceu quando pedi ao lint para SIMULAR a criacao do
+pipeline. Passei um tempo escrevendo no README uma ressalva com a causa provavel
+em vez de ir atras da causa confirmada - e ressalva com causa errada e' pior que
+ressalva nenhuma, porque parece informacao.
