@@ -34,7 +34,6 @@ flowchart LR
 | [Instalação](#instalação) | um comando; o caminho ao vivo pede um segundo |
 | [Teste mínimo](#teste-mínimo) | um comando, com a saída esperada literal |
 | [Experimentos](#experimentos) | as três reivindicações, uma subseção cada |
-| [Citação](#citação) | como citar, em texto e em BibTeX |
 | [LICENSE](#license) | MIT |
 
 Documentos complementares, nenhum necessário para a avaliação: [`docs/ABOUT.md`](docs/ABOUT.md) traz problema, motivação e limitações conhecidas; [`docs/USAGE.md`](docs/USAGE.md) os exemplos de uso, formatos de saída e códigos de saída; [`docs/COVERAGE.md`](docs/COVERAGE.md) a medição de cobertura que decidiu o desenho; [`docs/DOCUMENTATION.md`](docs/DOCUMENTATION.md) a arquitetura, a árvore do repositório e como estender.
@@ -210,23 +209,6 @@ Para ver a verificação contra o estado real da máquina:
 ```bash
 PYTHONPATH=src python3 -m dhaudit.cli backends
 ```
-
-# Citação
-
-Cristhian Kapelinski. *dhaudit: auditoria de hardening de imagens Docker sobre hadolint, trivy e dockle*, versão 1.0.0, 2026. Disponível em <https://gitlab.com/cristhianavila.aluno/docker-hardening-audit>.
-
-```bibtex
-@software{kapelinski2026dhaudit,
-  author  = {Kapelinski, Cristhian},
-  title   = {dhaudit: auditoria de hardening de imagens Docker sobre hadolint, trivy e dockle},
-  version = {1.0.0},
-  year    = {2026},
-  url     = {https://gitlab.com/cristhianavila.aluno/docker-hardening-audit},
-  license = {MIT}
-}
-```
-
-O arquivo [`CITATION.cff`](CITATION.cff) traz a mesma referência em formato legível por ferramenta.
 
 # LICENSE
 
