@@ -1,0 +1,21 @@
+{
+  "SchemaVersion": 2,
+  "Trivy": {
+    "Version": "0.74.0"
+  },
+  "ReportID": "01a08214-6e7a-7148-8ce2-0fda9ac333d6",
+  "CreatedAt": "2026-09-08T17:32:52.218085087Z",
+  "ArtifactName": "/scan/hardened_08_npm_ci.Dockerfile",
+  "ArtifactType": "filesystem",
+  "Results": [
+    {
+      "Target": "hardened_08_npm_ci.Dockerfile",
+      "Class": "config",
+      "Type": "dockerfile",
+      "MisconfSummary": {
+        "Successes": 27,
+        "Failures": 0
+      }
+    }
+  ]
+}

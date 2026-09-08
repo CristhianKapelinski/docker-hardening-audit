@@ -1,0 +1,21 @@
+{
+  "SchemaVersion": 2,
+  "Trivy": {
+    "Version": "0.74.0"
+  },
+  "ReportID": "01a08214-5ff2-78ab-a2c8-7db9e0ce5adf",
+  "CreatedAt": "2026-09-08T17:32:48.49856939Z",
+  "ArtifactName": "/scan/hardened_04_user_in_build_stage.Dockerfile",
+  "ArtifactType": "filesystem",
+  "Results": [
+    {
+      "Target": "hardened_04_user_in_build_stage.Dockerfile",
+      "Class": "config",
+      "Type": "dockerfile",
+      "MisconfSummary": {
+        "Successes": 27,
+        "Failures": 0
+      }
+    }
+  ]
+}

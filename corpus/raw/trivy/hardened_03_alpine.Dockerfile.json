@@ -1,0 +1,21 @@
+{
+  "SchemaVersion": 2,
+  "Trivy": {
+    "Version": "0.74.0"
+  },
+  "ReportID": "01a08214-5c74-77a6-bfc9-a9130001d6d6",
+  "CreatedAt": "2026-09-08T17:32:47.604502508Z",
+  "ArtifactName": "/scan/hardened_03_alpine.Dockerfile",
+  "ArtifactType": "filesystem",
+  "Results": [
+    {
+      "Target": "hardened_03_alpine.Dockerfile",
+      "Class": "config",
+      "Type": "dockerfile",
+      "MisconfSummary": {
+        "Successes": 27,
+        "Failures": 0
+      }
+    }
+  ]
+}

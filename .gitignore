@@ -1,0 +1,14 @@
+__pycache__/
+*.pyc
+*.egg-info/
+.pytest_cache/
+.venv/
+venv/
+build/
+dist/
+*.log
+# scan output written by the documented commands
+report.json
+report.sarif
+# live backend output; the run of record lives in corpus/raw/
+corpus/live/

@@ -1,0 +1,1 @@
+[{"code":"DL3016","column":1,"file":"-","level":"warning","line":4,"message":"Pin versions in npm. Instead of `npm install <package>` use `npm install <package>@<version>`"},{"code":"DL3064","column":1,"file":"-","level":"warning","line":6,"message":"Potentially sensitive data should not be used in the `ARG` or `ENV` commands"}]

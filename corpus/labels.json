@@ -1,0 +1,142 @@
+{
+  "_comment": "Ground truth per corpus file: the policy properties a correct audit must report, and no others. Written by hand from the file content, not from any tool output.",
+  "files": [
+    {
+      "path": "dockerfiles/vuln_01_root_user.Dockerfile",
+      "expected": [
+        "HARD-01"
+      ]
+    },
+    {
+      "path": "dockerfiles/vuln_02_mutable_tag.Dockerfile",
+      "expected": [
+        "HARD-02"
+      ]
+    },
+    {
+      "path": "dockerfiles/vuln_03_secret_env.Dockerfile",
+      "expected": [
+        "HARD-03"
+      ]
+    },
+    {
+      "path": "dockerfiles/vuln_04_pipe_to_shell.Dockerfile",
+      "expected": [
+        "HARD-04"
+      ]
+    },
+    {
+      "path": "dockerfiles/vuln_05_apt_cache.Dockerfile",
+      "expected": [
+        "HARD-05"
+      ]
+    },
+    {
+      "path": "dockerfiles/vuln_06_add_remote.Dockerfile",
+      "expected": [
+        "HARD-06"
+      ]
+    },
+    {
+      "path": "dockerfiles/vuln_07_world_writable.Dockerfile",
+      "expected": [
+        "HARD-07"
+      ]
+    },
+    {
+      "path": "dockerfiles/vuln_08_sensitive_port.Dockerfile",
+      "expected": [
+        "HARD-08"
+      ]
+    },
+    {
+      "path": "dockerfiles/vuln_09_no_healthcheck.Dockerfile",
+      "expected": [
+        "HARD-09"
+      ]
+    },
+    {
+      "path": "dockerfiles/vuln_10_sudo.Dockerfile",
+      "expected": [
+        "HARD-10"
+      ]
+    },
+    {
+      "path": "dockerfiles/vuln_11_unpinned_dep.Dockerfile",
+      "expected": [
+        "HARD-11"
+      ]
+    },
+    {
+      "path": "dockerfiles_no_ignore/vuln_12_no_dockerignore.Dockerfile",
+      "expected": [
+        "HARD-12"
+      ]
+    },
+    {
+      "path": "dockerfiles/vuln_13_legacy_stack.Dockerfile",
+      "expected": [
+        "HARD-01",
+        "HARD-02",
+        "HARD-03",
+        "HARD-04",
+        "HARD-05",
+        "HARD-07",
+        "HARD-08",
+        "HARD-09",
+        "HARD-10"
+      ]
+    },
+    {
+      "path": "dockerfiles/vuln_14_node_service.Dockerfile",
+      "expected": [
+        "HARD-01",
+        "HARD-02",
+        "HARD-03",
+        "HARD-09",
+        "HARD-11"
+      ]
+    },
+    {
+      "path": "dockerfiles/vuln_15_heredoc_pipe.Dockerfile",
+      "expected": [
+        "HARD-04"
+      ],
+      "note": "the pipe lives inside a BuildKit heredoc; documented limitation of every configuration"
+    },
+    {
+      "path": "dockerfiles/hardened_01_python.Dockerfile",
+      "expected": []
+    },
+    {
+      "path": "dockerfiles/hardened_02_multistage.Dockerfile",
+      "expected": []
+    },
+    {
+      "path": "dockerfiles/hardened_03_alpine.Dockerfile",
+      "expected": []
+    },
+    {
+      "path": "dockerfiles/hardened_04_user_in_build_stage.Dockerfile",
+      "expected": [],
+      "note": "USER is set in the stage the final stage inherits from"
+    },
+    {
+      "path": "dockerfiles/hardened_05_arg_without_default.Dockerfile",
+      "expected": [],
+      "note": "ARG with no default leaks nothing; both backends report it anyway"
+    },
+    {
+      "path": "dockerfiles/hardened_06_local_add_tar.Dockerfile",
+      "expected": []
+    },
+    {
+      "path": "dockerfiles/hardened_07_scratch.Dockerfile",
+      "expected": []
+    },
+    {
+      "path": "dockerfiles/hardened_08_npm_ci.Dockerfile",
+      "expected": []
+    }
+  ]
+}
