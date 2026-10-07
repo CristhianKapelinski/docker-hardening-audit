@@ -46,7 +46,7 @@ scripts/                pull_backends, minimal_test, reproduce, collect_backends
 tests/                  68 testes, sem rede e sem docker
 docs/                   ABOUT, USAGE, COVERAGE e este arquivo
 Dockerfile              imagem da ferramenta, auditada pela própria ferramenta
-.gitlab-ci.yml          pipeline de testes e reprodução (desligado nas configurações do projeto)
+.github/workflows/      pipeline de testes e reprodução, o mesmo conjunto do scripts/verify_all.sh
 CITATION.cff            referência legível por ferramenta
 ```
 

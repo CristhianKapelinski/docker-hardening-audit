@@ -1,6 +1,6 @@
 .git
 .gitignore
-.gitlab-ci.yml
+.github
 .pytest_cache
 __pycache__
 *.pyc

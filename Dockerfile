@@ -6,7 +6,7 @@ FROM python:3.12-slim@sha256:af4e85f1cac90dd3771e47292ea7c8a9830abfabbe4faa5c53f
 LABEL org.opencontainers.image.title="dhaudit" \
       org.opencontainers.image.description="Docker hardening audit over hadolint, trivy and dockle" \
       org.opencontainers.image.licenses="MIT" \
-      org.opencontainers.image.source="https://gitlab.com/cristhianavila.aluno/docker-hardening-audit"
+      org.opencontainers.image.source="https://github.com/CristhianKapelinski/docker-hardening-audit"
 
 WORKDIR /opt/dhaudit
 COPY pyproject.toml README.md LICENSE ./

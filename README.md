@@ -42,9 +42,9 @@ Documentos complementares, nenhum necessário para a avaliação: [`docs/ABOUT.m
 
 Os selos considerados são: **Disponíveis**, **Funcionais**, **Sustentáveis** e **Reprodutíveis**.
 
-- **Disponível.** Repositório público no GitLab, licença [MIT](LICENSE), e este README com as seções mínimas exigidas.
+- **Disponível.** Repositório público no GitHub, licença [MIT](LICENSE), e este README com as seções mínimas exigidas.
 - **Funcional.** O [teste mínimo](#teste-mínimo) é um comando, roda sem rede e sem docker, e exercita o caminho real (parser, backends, política, arbitragem, relatório e código de saída), não `--help`.
-- **Sustentável.** Uma responsabilidade por módulo em [`src/dhaudit/`](src/dhaudit), tipagem nas funções públicas, docstring por módulo dizendo qual decisão ele carrega, 68 testes sem rede, e [`docs/DOCUMENTATION.md`](docs/DOCUMENTATION.md) explicando como acrescentar propriedade ou backend. O pipeline está declarado em [`.gitlab-ci.yml`](.gitlab-ci.yml) e é válido pelo `ci/lint` oficial, mas o CI/CD está desligado nas configurações do projeto: esta conta não tem verificação de identidade e o GitLab responde `Identity verification is required in order to run CI jobs`, situação em que todo push cria um pipeline e o falha sem executar job. Um pipeline vermelho que nunca rodou é pior evidência do que nenhuma. [`scripts/verify_all.sh`](scripts/verify_all.sh) roda localmente o mesmo conjunto, em menos de um segundo.
+- **Sustentável.** Uma responsabilidade por módulo em [`src/dhaudit/`](src/dhaudit), tipagem nas funções públicas, docstring por módulo dizendo qual decisão ele carrega, 68 testes sem rede, e [`docs/DOCUMENTATION.md`](docs/DOCUMENTATION.md) explicando como acrescentar propriedade ou backend. O pipeline em [`.github/workflows/ci.yml`](.github/workflows/ci.yml) roda os testes, o teste mínimo e a Reivindicação #1 a cada push, e [`scripts/verify_all.sh`](scripts/verify_all.sh) roda localmente o mesmo conjunto, em menos de um segundo.
 - **Reprodutível.** [`scripts/reproduce.sh`](scripts/reproduce.sh) recomputa a tabela publicada a partir da corrida de referência versionada em [`corpus/raw/`](corpus/raw) e compara valor por valor com [`expected/values.json`](expected/values.json), imprimindo `obtido · esperado · ok` por valor e terminando em `RESULT: OK`, com saída não-zero em qualquer divergência.
 
 # Informações básicas
@@ -94,7 +94,7 @@ Puxar imagem por digest a guarda **sem tag**, então ela não aparece em `docker
 # Instalação
 
 ```bash
-git clone https://gitlab.com/cristhianavila.aluno/docker-hardening-audit.git && cd docker-hardening-audit
+git clone https://github.com/CristhianKapelinski/docker-hardening-audit.git && cd docker-hardening-audit
 ```
 
 É tudo o que o teste mínimo e a reprodução precisam: os scripts usam `PYTHONPATH=src` e só a biblioteca padrão, sem ambiente virtual e sem instalar pacote. Para o caminho ao vivo, baixe as três imagens de backend (287 MB, ~2 min):
